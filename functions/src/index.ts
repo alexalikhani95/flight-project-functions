@@ -6,6 +6,8 @@ import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import {initializeApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 import {setGlobalOptions} from "firebase-functions/v2/options";
+import * as functions from "firebase-functions";
+import * as admin from "firebase-admin";
 
 initializeApp();
 
@@ -13,7 +15,7 @@ setGlobalOptions({maxInstances: 10});
 
 // Take the text parameter passed to this HTTP endpoint and insert it into
 // Firestore under the path /messages/:documentId/original
-exports.addmessage = onRequest(async (req: any, res: any) => {
+exports.addmessage = onRequest(async (req, res) => {
   // Grab the text parameter.
   const original = req.query.text;
 
@@ -34,24 +36,61 @@ exports.addmessage = onRequest(async (req: any, res: any) => {
   }
 });
 
-// Listens for new messages added to /messages/:documentId/original
-// and saves an uppercased version of the message
-// to /messages/:documentId/uppercase
-exports.makeuppercase = onDocumentCreated(
-  "/messages/{documentId}",
-  (event: any) => {
-    // Grab the current value of what was written to Firestore.
-    const original = event.data.data().original;
 
-    // Access the parameter `{documentId}` with `event.params`
-    logger.log("Uppercasing", event.params.documentId, original);
+exports.newUserSignup = functions.auth.user().onCreate((user) => {
+  const email = user.email; // The email of the user.
+  const displayName = user.displayName; // The display name of the user
 
-    const uppercase = original.toUpperCase();
+  logger.log(email, displayName);
+  return admin.firestore().collection("users").doc(user.uid).set({
+    email: user.email,
+  });
+});
 
-    // You must return a Promise when performing
-    // asynchronous tasks inside a function
-    // such as writing to Firestore.
-    // Setting an 'uppercase' field in Firestore document returns a Promise.
-    return event.data.ref.set({uppercase}, {merge: true});
+exports.userDeleted = functions.auth.user().onDelete((user) => {
+  const doc = admin.firestore().collection("users").doc(user.uid);
+  return doc.delete();
+});
+
+// http callable function (adding a request)
+exports.addLocation = functions.https.onCall(async (data, context) => {
+  // check request is made by an authenticated user
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "only authenticated users can add requests"
+    );
   }
-);
+  // check request has a text body
+  if (data.text.length > 30) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "request must be no more than 30 characters long"
+    );
+  }
+
+  await admin.firestore().collection("locations").add({
+    text: data.text,
+  });
+});
+
+exports.addAge = functions.https.onCall(async (data, context) => {
+  // check request is made by an authenticated user
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "only authenticated users can add requests"
+    );
+  }
+  // check request has a text body
+  if (data.text.length > 3) {
+    throw new functions.https.HttpsError(
+      "invalid-argument",
+      "request must be no more than 3 characters long"
+    );
+  }
+
+  await admin.firestore().collection("ages").add({
+    text: data.text,
+  });
+});
