@@ -1,6 +1,5 @@
 import {logger} from "firebase-functions";
 import {onRequest} from "firebase-functions/v2/https";
-import {onDocumentCreated} from "firebase-functions/v2/firestore";
 
 // The Firebase Admin SDK to access Firestore.
 import {initializeApp} from "firebase-admin/app";
@@ -52,7 +51,6 @@ exports.userDeleted = functions.auth.user().onDelete((user) => {
   return doc.delete();
 });
 
-// http callable function (adding a request)
 exports.addLocation = functions.https.onCall(async (data, context) => {
   // check request is made by an authenticated user
   if (!context.auth) {
@@ -65,13 +63,42 @@ exports.addLocation = functions.https.onCall(async (data, context) => {
   if (data.text.length > 30) {
     throw new functions.https.HttpsError(
       "invalid-argument",
-      "request must be no more than 30 characters long"
+      "request must be no more than 3 characters long"
     );
   }
 
-  await admin.firestore().collection("locations").add({
-    text: data.text,
-  });
+  const email = context.auth.token.email;
+
+  // Check if a document with the user's email already exists
+  const querySnapshot = await admin.firestore()
+    .collection("locations")
+    .where("email", "==", email)
+    .get();
+
+  if (!querySnapshot.empty) {
+    // Update the existing document with the new time and email
+    const docRef = querySnapshot.docs[0].ref;
+    await docRef.update({
+      location: data.text,
+    });
+
+    return {result: `Age document updated for email: ${email}`};
+  } else {
+    // Create a new document
+    const locationData = {
+      age: data.text,
+      email: email,
+      userId: context.auth.uid, // Add the user ID
+    };
+
+    const locationDocRef = await admin.firestore()
+      .collection("locations")
+      .add(locationData);
+    return {
+      result:
+      `New age document added for email: ${email}, ID: ${locationDocRef.id}`,
+    };
+  }
 });
 
 exports.addAge = functions.https.onCall(async (data, context) => {
@@ -90,7 +117,34 @@ exports.addAge = functions.https.onCall(async (data, context) => {
     );
   }
 
-  await admin.firestore().collection("ages").add({
-    text: data.text,
-  });
+  const email = context.auth.token.email;
+
+  // Check if a document with the user's email already exists
+  const querySnapshot = await admin.firestore()
+    .collection("ages")
+    .where("email", "==", email)
+    .get();
+
+  if (!querySnapshot.empty) {
+    // Update the existing document with the new time and email
+    const docRef = querySnapshot.docs[0].ref;
+    await docRef.update({
+      age: data.text,
+    });
+
+    return {result: `Age document updated for email: ${email}`};
+  } else {
+    // Create a new document
+    const ageData = {
+      age: data.text,
+      email: email,
+      userId: context.auth.uid, // Add the user ID
+    };
+
+    const ageDocRef = await admin.firestore().collection("ages").add(ageData);
+
+    return {
+      result: `New age document added for email: ${email}, ID: ${ageDocRef.id}`,
+    };
+  }
 });
