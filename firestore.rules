@@ -2,11 +2,7 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /ages/{document=**} {
-      allow read: if request.auth != null;
-      allow write: if false; 
-    }
-    match /locations/{document=**} {
+    match /users/{document=**} {
       allow read: if request.auth != null;
       allow write: if false; 
     }
