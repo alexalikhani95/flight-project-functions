@@ -3,7 +3,7 @@ import {onRequest} from "firebase-functions/v2/https";
 
 // The Firebase Admin SDK to access Firestore.
 import {initializeApp} from "firebase-admin/app";
-import {getFirestore} from "firebase-admin/firestore";
+import {FieldValue, getFirestore} from "firebase-admin/firestore";
 import {setGlobalOptions} from "firebase-functions/v2/options";
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
@@ -37,11 +37,7 @@ exports.addmessage = onRequest(async (req, res) => {
 
 
 exports.newUserSignup = functions.auth.user().onCreate((user) => {
-  const email = user.email; // The email of the user.
-  const displayName = user.displayName; // The display name of the user
-
-  logger.log(email, displayName);
-  return admin.firestore().collection("users").doc(user.uid).set({
+  admin.firestore().collection("users").doc(user.uid).set({
     email: user.email,
   });
 });
@@ -74,7 +70,7 @@ exports.addLocation = functions.https.onCall(async (data, context) => {
     .collection("users")
     .where("email", "==", email)
     .get();
-    // Update the existing document with the new time and email
+    // Update the existing document with the new location
   const docRef = querySnapshot.docs[0].ref;
   await docRef.update({
     location: data.text,
@@ -107,7 +103,7 @@ exports.addAge = functions.https.onCall(async (data, context) => {
     .where("email", "==", email)
     .get();
 
-  // Update the existing document with the new time and email
+  // Update the existing document with the new age
   const docRef = querySnapshot.docs[0].ref;
   await docRef.update({
     age: data.text,
@@ -115,3 +111,33 @@ exports.addAge = functions.https.onCall(async (data, context) => {
 
   return {result: `User Age updated for email: ${email}`};
 });
+
+exports.addVisitedAirport = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      "unauthenticated",
+      "Only authenticated users can add requests"
+    );
+  }
+
+  const uid = context.auth.uid;
+
+  try {
+    const usersRef =
+  getFirestore().collection("users").doc(uid);
+
+    await usersRef.update({
+      visitedAirports: FieldValue.arrayUnion(data.text),
+    });
+
+    return {result: `Text added to visited airports array for UID: ${uid}`};
+  } catch (error) {
+    throw new functions.https.HttpsError(
+      "internal",
+      "Error updating visited airports array",
+      error
+    );
+  }
+});
+
+
