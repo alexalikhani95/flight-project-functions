@@ -1,4 +1,3 @@
-import {logger} from "firebase-functions";
 import {onRequest} from "firebase-functions/v2/https";
 
 // The Firebase Admin SDK to access Firestore.
@@ -47,69 +46,60 @@ exports.userDeleted = functions.auth.user().onDelete((user) => {
   return doc.delete();
 });
 
-exports.addLocation = functions.https.onCall(async (data, context) => {
-  // check request is made by an authenticated user
+exports.addAge = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
-      "only authenticated users can add requests"
+      "Only authenticated users can add requests"
     );
   }
-  // check request has a text body
-  if (data.text.length > 30) {
+
+  const uid = context.auth.uid;
+
+  try {
+    const usersRef =
+  getFirestore().collection("users").doc(uid);
+
+    await usersRef.update({
+      age: data.text,
+    });
+
+    return {result: `Text added to visited airports array for UID: ${uid}`};
+  } catch (error) {
     throw new functions.https.HttpsError(
-      "invalid-argument",
-      "request must be no more than 3 characters long"
+      "internal",
+      "Error updating age",
+      error
     );
   }
-
-  const email = context.auth.token.email;
-
-  // Check if a document with the user's email already exists
-  const querySnapshot = await admin.firestore()
-    .collection("users")
-    .where("email", "==", email)
-    .get();
-    // Update the existing document with the new location
-  const docRef = querySnapshot.docs[0].ref;
-  await docRef.update({
-    location: data.text,
-  });
-
-  return {result: `User location updated for email: ${email}`};
 });
 
-exports.addAge = functions.https.onCall(async (data, context) => {
-  // check request is made by an authenticated user
+exports.addLocation = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError(
       "unauthenticated",
-      "only authenticated users can add requests"
+      "Only authenticated users can add requests"
     );
   }
-  // check request has a text body
-  if (data.text.length > 10) {
+
+  const uid = context.auth.uid;
+
+  try {
+    const usersRef =
+  getFirestore().collection("users").doc(uid);
+
+    await usersRef.update({
+      location: data.text,
+    });
+
+    return {result: `Text added to visited airports array for UID: ${uid}`};
+  } catch (error) {
     throw new functions.https.HttpsError(
-      "invalid-argument",
-      "request must be no more than 3 characters long"
+      "internal",
+      "Error updating location",
+      error
     );
   }
-
-  const email = context.auth.token.email;
-
-  // Check if a document with the user's email already exists
-  const querySnapshot = await admin.firestore()
-    .collection("users")
-    .where("email", "==", email)
-    .get();
-
-  // Update the existing document with the new age
-  const docRef = querySnapshot.docs[0].ref;
-  await docRef.update({
-    age: data.text,
-  });
-
-  return {result: `User Age updated for email: ${email}`};
 });
 
 exports.addVisitedAirport = functions.https.onCall(async (data, context) => {
